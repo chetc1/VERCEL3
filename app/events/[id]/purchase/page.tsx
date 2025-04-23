@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Calendar, Clock, CreditCard, Info, Users } from "lucide-react"
@@ -35,7 +35,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
   })
 
   // Fetch event data
-  useState(() => {
+  useEffect(() => {
     const fetchEvent = async () => {
       try {
         const eventData = await getEvent(params.id)
@@ -57,7 +57,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
     }
 
     fetchEvent()
-  })
+  }, [params.id, router, toast])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -271,7 +271,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
                     <img
-                      src={`/placeholder.svg?height=80&width=80&query=${encodeURIComponent(event.title)}`}
+                      src={`/abstract-geometric-shapes.png?key=8qr21&height=80&width=80&query=${encodeURIComponent(event.title)}`}
                       alt={event.title}
                       className="rounded-lg object-cover"
                       width={80}

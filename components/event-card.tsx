@@ -107,7 +107,7 @@ export function EventCard({ event, featured = false }: EventCardProps) {
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full">
-          <Link href={`/events/${event.id}`}>Buy Ticket</Link>
+          <Link href={`/events/${event.id}/purchase`}>Buy Ticket</Link>
         </Button>
       </CardFooter>
     </Card>

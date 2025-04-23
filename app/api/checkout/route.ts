@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { eventId, userId, price } = await req.json()
 
     // Validate the request
-    if (!eventId || !userId || !price) {
+    if (!eventId || !userId || price === undefined) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
@@ -69,44 +69,5 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Error creating checkout session:", error)
     return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 })
-  }
-}
-
-export async function GET(req: NextRequest) {
-  try {
-    // If Stripe is not configured, return a mock response
-    if (!stripe) {
-      return NextResponse.json({
-        success: true,
-        status: "complete",
-        eventId: req.url.split("event_id=")[1]?.split("&")[0] || "mock-event",
-        userId: "user-6", // Guest user
-        amount: 2500, // $25.00
-      })
-    }
-
-    const url = new URL(req.url)
-    const sessionId = url.searchParams.get("session_id")
-
-    if (!sessionId) {
-      return NextResponse.json({ error: "Missing session ID" }, { status: 400 })
-    }
-
-    const session = await stripe.checkout.sessions.retrieve(sessionId)
-
-    if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      status: session.status,
-      eventId: session.metadata?.eventId,
-      userId: session.metadata?.userId,
-      amount: session.amount_total,
-    })
-  } catch (error) {
-    console.error("Error verifying checkout session:", error)
-    return NextResponse.json({ error: "Failed to verify checkout session" }, { status: 500 })
   }
 }

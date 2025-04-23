@@ -58,11 +58,11 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
     "zod": "^3.24.1",
-    "@stripe/stripe-js": "latest",
     "@clerk/nextjs": "latest",
     "@clerk/themes": "latest",
     "stripe": "latest",
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "@stripe/stripe-js": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
