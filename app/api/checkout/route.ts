@@ -13,29 +13,16 @@ export async function POST(req: NextRequest) {
   console.log("API: Received checkout request")
 
   try {
-    // If Stripe is not configured, return a mock response
-    if (!stripe) {
-      console.log("API: Stripe not configured, returning mock response")
-      const body = await req.json()
-      const { eventId } = body
-
-      if (!eventId) {
-        return NextResponse.json({ error: "Missing eventId" }, { status: 400 })
-      }
-
-      const mockSessionId = `mock_session_${Date.now()}`
-      const mockUrl = `/events/${eventId}/purchase/success?session_id=${mockSessionId}`
-
-      return NextResponse.json({
-        success: true,
-        sessionId: mockSessionId,
-        url: mockUrl,
-      })
+    // Parse the request body
+    let body
+    try {
+      body = await req.json()
+    } catch (error) {
+      console.error("API: Failed to parse request body", error)
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
-    const body = await req.json()
     console.log("API: Request body:", body)
-
     const { eventId, userId, price } = body
 
     // Validate the request
@@ -54,6 +41,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing price" }, { status: 400 })
     }
 
+    // If Stripe is not configured, return a mock response
+    if (!stripe) {
+      console.log("API: Stripe not configured, returning mock response")
+      const mockSessionId = `mock_session_${Date.now()}_${eventId}`
+      const mockUrl = `/events/${eventId}/purchase/success?session_id=${mockSessionId}`
+
+      return NextResponse.json({
+        success: true,
+        sessionId: mockSessionId,
+        url: mockUrl,
+      })
+    }
+
     // Get event details
     console.log("API: Fetching event details for:", eventId)
     const event = await getEvent(eventId)
@@ -61,6 +61,12 @@ export async function POST(req: NextRequest) {
     if (!event) {
       console.log("API: Event not found")
       return NextResponse.json({ error: "Event not found" }, { status: 404 })
+    }
+
+    // Ensure we have a valid price
+    const safePrice = typeof price === "number" ? price : 0
+    if (safePrice < 0) {
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 })
     }
 
     console.log("API: Creating Stripe checkout session")
@@ -75,7 +81,7 @@ export async function POST(req: NextRequest) {
               name: event.title || "Event Ticket",
               description: `Ticket for ${event.title || "Event"}`,
             },
-            unit_amount: Math.round((price || 0) * 100), // Convert to cents
+            unit_amount: Math.round(safePrice * 100), // Convert to cents
           },
           quantity: 1,
         },
@@ -86,8 +92,8 @@ export async function POST(req: NextRequest) {
       metadata: {
         eventId,
         userId,
-        platformFee: Math.round((price || 0) * 0.07 * 100) / 100, // 7% platform fee
-        hostRevenue: Math.round((price || 0) * 0.93 * 100) / 100, // 93% to host
+        platformFee: Math.round(safePrice * 0.07 * 100) / 100, // 7% platform fee
+        hostRevenue: Math.round(safePrice * 0.93 * 100) / 100, // 93% to host
       },
     })
 

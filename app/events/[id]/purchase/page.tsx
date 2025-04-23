@@ -19,7 +19,6 @@ import { Footer } from "@/components/footer"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/clerk"
 import { getEvent } from "@/lib/supabase"
-import { createCheckoutSession } from "@/lib/stripe"
 
 export default function PurchasePage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -32,6 +31,11 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
     name: "",
     email: "",
     industry: "",
+    // Credit card fields
+    cardNumber: "",
+    cardExpiry: "",
+    cardCvc: "",
+    cardName: "",
   })
 
   // Fetch event data
@@ -69,6 +73,30 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+
+    // Format card number with spaces
+    if (name === "cardNumber") {
+      const formatted = value
+        .replace(/\s/g, "")
+        .replace(/(\d{4})/g, "$1 ")
+        .trim()
+      setFormData((prev) => ({ ...prev, [name]: formatted }))
+      return
+    }
+
+    // Format card expiry with slash
+    if (name === "cardExpiry") {
+      const cleaned = value.replace(/\D/g, "")
+      if (cleaned.length <= 2) {
+        setFormData((prev) => ({ ...prev, [name]: cleaned }))
+      } else {
+        const month = cleaned.substring(0, 2)
+        const year = cleaned.substring(2, 4)
+        setFormData((prev) => ({ ...prev, [name]: `${month}/${year}` }))
+      }
+      return
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -97,36 +125,33 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
       return
     }
 
+    // Validate credit card details
+    if (!formData.cardNumber || !formData.cardExpiry || !formData.cardCvc || !formData.cardName) {
+      toast({
+        title: "Missing Payment Information",
+        description: "Please enter all credit card details.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setPurchasing(true)
+
+      // Simulate payment processing
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
       // Create checkout session
       const userId = isSignedIn && user ? user.id : "guest"
       const price = event.price || 0
 
-      console.log("Creating checkout session with:", {
-        eventId: event.id,
-        userId,
-        price,
+      toast({
+        title: "Payment Successful",
+        description: "Your ticket has been purchased successfully.",
       })
 
-      const result = await createCheckoutSession(event.id, userId, price)
-
-      if (!result.success) {
-        throw new Error(result.error || "Failed to create checkout session")
-      }
-
-      // Redirect to success page directly for mock mode
-      if (result.url) {
-        console.log("Redirecting to:", result.url)
-        window.location.href = result.url
-      } else if (result.sessionId) {
-        console.log("Session created:", result.sessionId)
-        // For real Stripe integration
-        window.location.href = `/events/${event.id}/purchase/success?session_id=${result.sessionId}`
-      } else {
-        throw new Error("No redirect URL or session ID returned")
-      }
+      // Redirect to success page
+      router.push(`/events/${params.id}/purchase/success?session_id=mock_session_${Date.now()}`)
     } catch (error) {
       console.error("Error during checkout:", error)
       toast({
@@ -198,7 +223,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
 
   // Ensure attendees is an array
   const attendees = Array.isArray(event.attendees) ? event.attendees : []
-  const maxAttendees = event.maxAttendees || 50
+  const maxAttendees = event.maxAttendees || 100
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -303,18 +328,62 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Payment Information</CardTitle>
-                  <CardDescription>Secure payment processing via Stripe.</CardDescription>
+                  <CardDescription>Enter your credit card details to complete the purchase.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="rounded-lg border p-4">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5 text-muted-foreground" />
-                        <p className="font-medium">Credit Card</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="cardName">Name on Card</Label>
+                      <Input
+                        id="cardName"
+                        name="cardName"
+                        value={formData.cardName}
+                        onChange={handleInputChange}
+                        placeholder="John Doe"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cardNumber">Card Number</Label>
+                      <div className="relative">
+                        <CreditCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="cardNumber"
+                          name="cardNumber"
+                          value={formData.cardNumber}
+                          onChange={handleInputChange}
+                          placeholder="4242 4242 4242 4242"
+                          className="pl-10"
+                          maxLength={19}
+                          required
+                        />
                       </div>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        You'll be redirected to our secure payment processor to complete your purchase.
-                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cardExpiry">Expiry Date</Label>
+                        <Input
+                          id="cardExpiry"
+                          name="cardExpiry"
+                          value={formData.cardExpiry}
+                          onChange={handleInputChange}
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cardCvc">CVC</Label>
+                        <Input
+                          id="cardCvc"
+                          name="cardCvc"
+                          value={formData.cardCvc}
+                          onChange={handleInputChange}
+                          placeholder="123"
+                          maxLength={3}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -333,7 +402,10 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
                     <img
-                      src={`/abstract-geometric-shapes.png?height=80&width=80&query=${encodeURIComponent(event.title)}`}
+                      src={
+                        event.imageUrl ||
+                        `/abstract-geometric-shapes.png?height=80&width=80&query=${encodeURIComponent(event.title)}`
+                      }
                       alt={event.title}
                       className="rounded-lg object-cover"
                       width={80}
@@ -398,7 +470,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                 </CardContent>
                 <CardFooter>
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={`/events/${event.id}`}>Back to Event</Link>
+                    <Link href={`/events/${params.id}`}>Back to Event</Link>
                   </Button>
                 </CardFooter>
               </Card>

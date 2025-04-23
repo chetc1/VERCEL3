@@ -1,4 +1,6 @@
-import { Suspense } from "react"
+"use client"
+
+import { useState } from "react"
 import { Calendar, Filter } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -7,21 +9,74 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { EventCard } from "@/components/event-card"
-import { getEvents } from "@/lib/supabase"
+import { mockEvents, mockUsers } from "@/lib/mock-data"
 
-export const revalidate = 86400 // Revalidate every 24 hours
+export default function EventsPage() {
+  const [events, setEvents] = useState(
+    mockEvents.map((event) => {
+      const host = mockUsers.find((user) => user.id === event.hostId)
+      return { ...event, host }
+    }),
+  )
 
-export default async function EventsPage() {
-  // Initialize events as an empty array to prevent undefined
-  let events = []
+  const [filteredEvents, setFilteredEvents] = useState(events)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [industry, setIndustry] = useState("all")
+  const [date, setDate] = useState("")
+  const [minPrice, setMinPrice] = useState("")
+  const [maxPrice, setMaxPrice] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  try {
-    const fetchedEvents = await getEvents()
-    // Ensure events is always an array
-    events = Array.isArray(fetchedEvents) ? fetchedEvents : []
-  } catch (error) {
-    console.error("Error fetching events:", error)
-    // Continue with empty events array
+  // Apply filters when filter button is clicked
+  const applyFilters = () => {
+    setLoading(true)
+
+    let filtered = events
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (event) =>
+          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          event.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    // Apply industry filter
+    if (industry && industry !== "all") {
+      filtered = filtered.filter((event) => event.industry === industry)
+    }
+
+    // Apply date filter
+    if (date) {
+      const selectedDate = new Date(date)
+      filtered = filtered.filter((event) => {
+        const eventDate = new Date(event.startTime)
+        return eventDate.toDateString() === selectedDate.toDateString()
+      })
+    }
+
+    // Apply price filters
+    if (minPrice) {
+      filtered = filtered.filter((event) => event.price >= Number.parseFloat(minPrice))
+    }
+
+    if (maxPrice) {
+      filtered = filtered.filter((event) => event.price <= Number.parseFloat(maxPrice))
+    }
+
+    setFilteredEvents(filtered)
+    setLoading(false)
+  }
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm("")
+    setIndustry("all")
+    setDate("")
+    setMinPrice("")
+    setMaxPrice("")
+    setFilteredEvents(events)
   }
 
   return (
@@ -50,23 +105,31 @@ export default async function EventsPage() {
                       <label htmlFor="search" className="text-sm font-medium">
                         Search
                       </label>
-                      <Input id="search" placeholder="Search events..." className="w-full" />
+                      <Input
+                        id="search"
+                        placeholder="Search events..."
+                        className="w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label htmlFor="industry" className="text-sm font-medium">
                         Industry
                       </label>
-                      <Select>
+                      <Select value={industry} onValueChange={setIndustry}>
                         <SelectTrigger id="industry">
                           <SelectValue placeholder="All Industries" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Industries</SelectItem>
-                          <SelectItem value="technology">Technology</SelectItem>
-                          <SelectItem value="marketing">Marketing</SelectItem>
-                          <SelectItem value="finance">Finance</SelectItem>
-                          <SelectItem value="design">Design</SelectItem>
-                          <SelectItem value="business">Business</SelectItem>
+                          <SelectItem value="Technology">Technology</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
+                          <SelectItem value="Finance">Finance</SelectItem>
+                          <SelectItem value="Design">Design</SelectItem>
+                          <SelectItem value="Business">Business</SelectItem>
+                          <SelectItem value="Education">Education</SelectItem>
+                          <SelectItem value="Health">Health</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -76,7 +139,13 @@ export default async function EventsPage() {
                       </label>
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <Input id="date" type="date" className="w-full" />
+                        <Input
+                          id="date"
+                          type="date"
+                          className="w-full"
+                          value={date}
+                          onChange={(e) => setDate(e.target.value)}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -84,32 +153,56 @@ export default async function EventsPage() {
                         Price Range
                       </label>
                       <div className="grid grid-cols-2 gap-2">
-                        <Input id="min-price" type="number" placeholder="Min" className="w-full" />
-                        <Input id="max-price" type="number" placeholder="Max" className="w-full" />
+                        <Input
+                          id="min-price"
+                          type="number"
+                          placeholder="Min"
+                          className="w-full"
+                          value={minPrice}
+                          onChange={(e) => setMinPrice(e.target.value)}
+                        />
+                        <Input
+                          id="max-price"
+                          type="number"
+                          placeholder="Max"
+                          className="w-full"
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(e.target.value)}
+                        />
                       </div>
                     </div>
-                    <Button className="w-full">
-                      <Filter className="mr-2 h-4 w-4" />
-                      Apply Filters
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={applyFilters}>
+                        <Filter className="mr-2 h-4 w-4" />
+                        Apply Filters
+                      </Button>
+                      <Button variant="outline" onClick={resetFilters}>
+                        Reset
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
               <div className="md:w-3/4">
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  <Suspense fallback={<p>Loading events...</p>}>
-                    {events && events.length > 0 ? (
-                      events.map((event) => <EventCard key={event.id} event={event} />)
+                {loading ? (
+                  <div className="flex justify-center">
+                    <p>Loading events...</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredEvents.length > 0 ? (
+                      filteredEvents.map((event) => <EventCard key={event.id} event={event} />)
                     ) : (
                       <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
                         <h3 className="mt-2 text-lg font-semibold">No events found</h3>
                         <p className="mb-4 mt-1 text-sm text-muted-foreground">
                           Try adjusting your filters or check back later.
                         </p>
+                        <Button onClick={resetFilters}>Reset Filters</Button>
                       </div>
                     )}
-                  </Suspense>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

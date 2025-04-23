@@ -12,7 +12,6 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { useToast } from "@/components/ui/use-toast"
 import { getEvent } from "@/lib/supabase"
-import { verifyCheckoutSession } from "@/lib/stripe"
 
 export default function SuccessPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -20,14 +19,11 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
   const { toast } = useToast()
   const [event, setEvent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [verified, setVerified] = useState(false)
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id")
-    console.log("Success page: Session ID from URL:", sessionId)
 
     if (!sessionId) {
-      console.log("Success page: No session ID found, redirecting to event page")
       toast({
         title: "Missing Information",
         description: "No purchase information found. Redirecting to event page.",
@@ -37,42 +33,24 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
       return
     }
 
-    const verifyPurchase = async () => {
+    const fetchEventData = async () => {
       try {
-        console.log("Success page: Verifying purchase")
-        // Verify the checkout session
-        const result = await verifyCheckoutSession(sessionId)
-        console.log("Success page: Verification result:", result)
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to verify purchase")
+        if (!params.id) {
+          throw new Error("Invalid event ID")
         }
 
-        setVerified(true)
-        console.log("Success page: Purchase verified")
-
-        // Fetch event details
-        console.log("Success page: Fetching event details")
         const eventData = await getEvent(params.id)
 
         if (!eventData) {
-          console.log("Success page: Event not found")
-          toast({
-            title: "Event Not Found",
-            description: "The event you purchased a ticket for could not be found.",
-            variant: "destructive",
-          })
-          router.push("/events")
-          return
+          throw new Error("Event not found")
         }
 
-        console.log("Success page: Event data loaded")
         setEvent(eventData)
       } catch (error) {
-        console.error("Success page: Error verifying purchase:", error)
+        console.error("Error fetching event:", error)
         toast({
-          title: "Verification Error",
-          description: "There was a problem verifying your purchase. Please contact support.",
+          title: "Error",
+          description: "Failed to load event details. Please try again.",
           variant: "destructive",
         })
         router.push(`/events/${params.id}`)
@@ -81,7 +59,7 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
       }
     }
 
-    verifyPurchase()
+    fetchEventData()
   }, [params.id, router, searchParams, toast])
 
   // Safe date parsing and formatting
@@ -117,16 +95,16 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
     )
   }
 
-  if (!verified || !event) {
+  if (!event) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Purchase Verification Failed</h2>
-            <p className="mb-4">We couldn't verify your purchase. Please try again or contact support.</p>
+            <h2 className="text-2xl font-bold mb-2">Event Not Found</h2>
+            <p className="mb-4">The event you purchased a ticket for could not be found.</p>
             <Button asChild>
-              <Link href={`/events/${params.id}`}>Back to Event</Link>
+              <Link href="/events">Browse Events</Link>
             </Button>
           </div>
         </main>
@@ -155,7 +133,7 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
               <div className="text-center">
-                <h2 className="text-2xl font-bold">{event.title}</h2>
+                <h2 className="text-2xl font-bold">{event.title || "Event"}</h2>
                 <p className="text-muted-foreground">Your ticket has been confirmed and is ready to use.</p>
               </div>
               <div className="rounded-lg border p-4 space-y-4">

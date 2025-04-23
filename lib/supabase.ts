@@ -23,7 +23,12 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 let supabase: ReturnType<typeof createClient> | null = null
 
 if (supabaseUrl && supabaseKey) {
-  supabase = createClient(supabaseUrl, supabaseKey)
+  try {
+    supabase = createClient(supabaseUrl, supabaseKey)
+    console.log("Supabase client initialized successfully")
+  } catch (error) {
+    console.error("Failed to initialize Supabase client:", error)
+  }
 }
 
 // Check if Supabase is configured
@@ -34,10 +39,17 @@ const isSupabaseConfigured = () => {
 // Event functions
 export async function getEvent(id: string) {
   try {
+    if (!id) {
+      console.error("getEvent: Missing event ID")
+      return null
+    }
+
     if (!isSupabaseConfigured()) {
+      console.log(`getEvent: Using mock data for event ${id}`)
       return getEventById(id)
     }
 
+    console.log(`getEvent: Fetching event ${id} from Supabase`)
     const { data, error } = await supabase!.from("events").select("*, host:users(*)").eq("id", id).single()
 
     if (error) {
@@ -55,9 +67,11 @@ export async function getEvent(id: string) {
 export async function getEvents(limit?: number) {
   try {
     if (!isSupabaseConfigured()) {
-      return getUpcomingEvents(limit)
+      console.log("getEvents: Using mock data")
+      return getMockUpcomingEvents(limit)
     }
 
+    console.log("getEvents: Fetching events from Supabase")
     const query = supabase!
       .from("events")
       .select("*, host:users(*)")
@@ -85,9 +99,11 @@ export async function getEvents(limit?: number) {
 export async function getUpcomingEvents(limit?: number) {
   try {
     if (!isSupabaseConfigured()) {
+      console.log("getUpcomingEvents: Using mock data")
       return getMockUpcomingEvents(limit)
     }
 
+    console.log("getUpcomingEvents: Fetching upcoming events from Supabase")
     const { data, error } = await supabase!
       .from("events")
       .select("*, host:users(*)")
@@ -109,10 +125,17 @@ export async function getUpcomingEvents(limit?: number) {
 
 export async function getEventsByHost(hostId: string) {
   try {
+    if (!hostId) {
+      console.error("getEventsByHost: Missing host ID")
+      return []
+    }
+
     if (!isSupabaseConfigured()) {
+      console.log(`getEventsByHost: Using mock data for host ${hostId}`)
       return getEventsByHostId(hostId)
     }
 
+    console.log(`getEventsByHost: Fetching events for host ${hostId} from Supabase`)
     const { data, error } = await supabase!
       .from("events")
       .select("*, host:users(*)")
@@ -133,10 +156,17 @@ export async function getEventsByHost(hostId: string) {
 
 export async function getEventsByAttendee(attendeeId: string) {
   try {
+    if (!attendeeId) {
+      console.error("getEventsByAttendee: Missing attendee ID")
+      return []
+    }
+
     if (!isSupabaseConfigured()) {
+      console.log(`getEventsByAttendee: Using mock data for attendee ${attendeeId}`)
       return getEventsByAttendeeId(attendeeId)
     }
 
+    console.log(`getEventsByAttendee: Fetching events for attendee ${attendeeId} from Supabase`)
     const { data, error } = await supabase!.from("tickets").select("event_id").eq("user_id", attendeeId)
 
     if (error) {
@@ -171,12 +201,15 @@ export async function getEventsByAttendee(attendeeId: string) {
 export async function getFeaturedEvent() {
   try {
     if (!isSupabaseConfigured()) {
+      console.log("getFeaturedEvent: Using mock data")
       return getMockFeaturedEvent()
     }
 
+    console.log("getFeaturedEvent: Fetching featured event from Supabase")
     const { data, error } = await supabase!.from("events").select("*, host:users(*)").eq("featured", true).single()
 
     if (error) {
+      console.log("No featured event found, fetching first upcoming event")
       // If no featured event, return the first upcoming event
       const { data: firstEvent, error: firstEventError } = await supabase!
         .from("events")

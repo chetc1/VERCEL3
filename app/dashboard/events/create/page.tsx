@@ -2,10 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Calendar, Clock, DollarSign, Info, Users } from "lucide-react"
+import { Calendar, Clock, DollarSign, Info, Upload, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,21 +19,27 @@ import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/clerk"
 import { createEvent } from "@/lib/supabase"
 import { createRoom } from "@/lib/daily"
+import { Slider } from "@/components/ui/slider"
 
 export default function CreateEventPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { isSignedIn, user, signIn } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [duration, setDuration] = useState(60) // Default duration in minutes
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     date: "",
     startTime: "",
-    endTime: "",
+    image: null as File | null,
     price: "",
-    maxAttendees: "50",
+    maxAttendees: "100", // Increased from 50 to 100
     industry: "",
+    bankAccount: "",
+    routingNumber: "",
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -43,6 +49,20 @@ export default function CreateEventPage() {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setFormData((prev) => ({ ...prev, image: file }))
+
+      // Create preview URL
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,7 +86,6 @@ export default function CreateEventPage() {
         !formData.description ||
         !formData.date ||
         !formData.startTime ||
-        !formData.endTime ||
         !formData.price ||
         !formData.maxAttendees ||
         !formData.industry
@@ -76,11 +95,9 @@ export default function CreateEventPage() {
 
       // Parse dates and times
       const startDateTime = new Date(`${formData.date}T${formData.startTime}`)
-      const endDateTime = new Date(`${formData.date}T${formData.endTime}`)
 
-      if (endDateTime <= startDateTime) {
-        throw new Error("End time must be after start time")
-      }
+      // Calculate end time based on duration
+      const endDateTime = new Date(startDateTime.getTime() + duration * 60000)
 
       // Create event
       const eventData = {
@@ -94,6 +111,9 @@ export default function CreateEventPage() {
         attendees: [],
         industry: formData.industry,
         status: "upcoming",
+        imageUrl: imagePreview, // Store the image URL
+        bankAccount: formData.bankAccount,
+        routingNumber: formData.routingNumber,
       }
 
       const result = await createEvent(eventData)
@@ -202,6 +222,34 @@ export default function CreateEventPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label>Event Thumbnail</Label>
+                    <div className="flex items-center gap-4">
+                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Image
+                      </Button>
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {formData.image ? formData.image.name : "No file selected"}
+                      </span>
+                    </div>
+                    {imagePreview && (
+                      <div className="mt-4">
+                        <img
+                          src={imagePreview || "/placeholder.svg"}
+                          alt="Event thumbnail preview"
+                          className="max-h-40 rounded-md"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -225,35 +273,41 @@ export default function CreateEventPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startTime">Start Time</Label>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="startTime"
-                          name="startTime"
-                          type="time"
-                          value={formData.startTime}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Start Time</Label>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="startTime"
+                        name="startTime"
+                        type="time"
+                        value={formData.startTime}
+                        onChange={handleInputChange}
+                        required
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endTime">End Time</Label>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="endTime"
-                          name="endTime"
-                          type="time"
-                          value={formData.endTime}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Duration (minutes)</Label>
+                    <div className="flex items-center gap-4">
+                      <Slider
+                        defaultValue={[60]}
+                        min={15}
+                        max={100}
+                        step={5}
+                        onValueChange={(value) => setDuration(value[0])}
+                        className="flex-1"
+                      />
+                      <span className="w-12 text-center">{duration}</span>
                     </div>
+                    <p className="text-sm text-muted-foreground">
+                      Event will end at{" "}
+                      {formData.startTime && formData.date
+                        ? new Date(
+                            new Date(`${formData.date}T${formData.startTime}`).getTime() + duration * 60000,
+                          ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : "--:--"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Info className="h-4 w-4" />
@@ -297,14 +351,46 @@ export default function CreateEventPage() {
                         name="maxAttendees"
                         type="number"
                         min="1"
-                        max="50"
+                        max="100"
                         value={formData.maxAttendees}
                         onChange={handleInputChange}
                         required
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground">Maximum 50 attendees per event.</p>
+                    <p className="text-sm text-muted-foreground">Maximum 100 attendees per event.</p>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Information</CardTitle>
+                  <CardDescription>Where should we send your earnings?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bankAccount">Bank Account Number</Label>
+                    <Input
+                      id="bankAccount"
+                      name="bankAccount"
+                      value={formData.bankAccount}
+                      onChange={handleInputChange}
+                      placeholder="Enter your bank account number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="routingNumber">Routing Number</Label>
+                    <Input
+                      id="routingNumber"
+                      name="routingNumber"
+                      value={formData.routingNumber}
+                      onChange={handleInputChange}
+                      placeholder="Enter your routing number"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Your payment information is securely stored and only used for sending your event earnings.
+                  </p>
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <Button asChild variant="outline">

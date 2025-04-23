@@ -66,7 +66,7 @@ export function Header() {
             {isSignedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
+                  <Button variant="outline" size="icon" className="rounded-full bg-primary text-primary-foreground">
                     {user?.image ? (
                       <img
                         src={user.image || "/placeholder.svg"}

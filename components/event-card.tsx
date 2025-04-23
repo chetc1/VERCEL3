@@ -14,6 +14,9 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, featured = false }: EventCardProps) {
+  // Ensure event has an id
+  const eventId = event?.id || "unknown"
+
   // Safely parse dates with error handling
   const parseDate = (dateString: string) => {
     try {
@@ -25,14 +28,12 @@ export function EventCard({ event, featured = false }: EventCardProps) {
       return date
     } catch (error) {
       console.error(`Error parsing date: ${dateString}`, error)
-      return new Date() // Fallback  {
-      console.error(`Error parsing date: ${dateString}`, error)
       return new Date() // Fallback to current date
     }
   }
 
-  const startDate = parseDate(event.startTime)
-  const endDate = parseDate(event.endTime)
+  const startDate = event?.startTime ? parseDate(event.startTime) : new Date()
+  const endDate = event?.endTime ? parseDate(event.endTime) : new Date()
 
   // Safe formatting with fallbacks
   const formatDateSafely = (date: Date, formatStr: string, fallback = "N/A") => {
@@ -57,6 +58,13 @@ export function EventCard({ event, featured = false }: EventCardProps) {
   const formattedTime = `${formatDateSafely(startDate, "h:mm a")} - ${formatDateSafely(endDate, "h:mm a")}`
   const timeFromNow = formatDistanceSafely(startDate)
 
+  // Ensure price is a number
+  const price = typeof event?.price === "number" ? event.price : 0
+
+  // Ensure attendees is an array
+  const attendees = Array.isArray(event?.attendees) ? event.attendees : []
+  const maxAttendees = event?.maxAttendees || 50
+
   return (
     <Card className={featured ? "border-primary" : ""}>
       {featured && (
@@ -66,11 +74,11 @@ export function EventCard({ event, featured = false }: EventCardProps) {
       )}
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{event.industry}</Badge>
+          <Badge variant="outline">{event?.industry || "General"}</Badge>
           <Badge variant="secondary">{timeFromNow}</Badge>
         </div>
-        <CardTitle className="line-clamp-1">{event.title}</CardTitle>
-        <CardDescription className="line-clamp-2">{event.description}</CardDescription>
+        <CardTitle className="line-clamp-1">{event?.title || "Untitled Event"}</CardTitle>
+        <CardDescription className="line-clamp-2">{event?.description || "No description available."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
@@ -86,28 +94,28 @@ export function EventCard({ event, featured = false }: EventCardProps) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">${event.price.toFixed(2)}</span>
+            <span className="text-sm">${price.toFixed(2)}</span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              {Array.isArray(event.attendees) ? event.attendees.length : 0}/{event.maxAttendees} attendees
+              {attendees.length}/{maxAttendees} attendees
             </span>
           </div>
         </div>
-        {event.host && (
+        {event?.host && (
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={event.host.image || "/placeholder.svg"} alt={event.host.name} />
-              <AvatarFallback>{event.host.name.charAt(0)}</AvatarFallback>
+              <AvatarImage src={event.host.image || "/placeholder.svg"} alt={event.host.name || "Host"} />
+              <AvatarFallback>{(event.host.name || "H").charAt(0)}</AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">Hosted by {event.host.name}</span>
+            <span className="text-sm font-medium">Hosted by {event.host.name || "Anonymous"}</span>
           </div>
         )}
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full">
-          <Link href={`/events/${event.id}/purchase`}>Buy Ticket</Link>
+          <Link href={`/events/${eventId}`}>View Event</Link>
         </Button>
       </CardFooter>
     </Card>

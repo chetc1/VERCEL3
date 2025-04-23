@@ -26,6 +26,7 @@ interface MockAuthContextType {
   user: typeof GUEST_USER | null
   signIn: () => void
   signOut: () => void
+  signInWithEmailPassword: (email: string, password: string) => Promise<boolean>
 }
 
 const MockAuthContext = createContext<MockAuthContextType>({
@@ -33,6 +34,7 @@ const MockAuthContext = createContext<MockAuthContextType>({
   user: null,
   signIn: () => {},
   signOut: () => {},
+  signInWithEmailPassword: async () => false,
 })
 
 function MockAuthProvider({ children }: { children: React.ReactNode }) {
@@ -49,7 +51,22 @@ function MockAuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
-  return <MockAuthContext.Provider value={{ isSignedIn, user, signIn, signOut }}>{children}</MockAuthContext.Provider>
+  const signInWithEmailPassword = async (email: string, password: string) => {
+    // Simple mock validation - in a real app, this would validate against a database
+    if (email && password.length >= 6) {
+      const matchedUser = mockUsers.find((u) => u.email === email) || GUEST_USER
+      setIsSignedIn(true)
+      setUser(matchedUser)
+      return true
+    }
+    return false
+  }
+
+  return (
+    <MockAuthContext.Provider value={{ isSignedIn, user, signIn, signOut, signInWithEmailPassword }}>
+      {children}
+    </MockAuthContext.Provider>
+  )
 }
 
 export function ClerkProvider({ children }: { children: React.ReactNode }) {
@@ -65,6 +82,9 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       appearance={{
         baseTheme: theme === "dark" ? dark : undefined,
+        elements: {
+          formButtonPrimary: "bg-primary hover:bg-primary/90",
+        },
       }}
     >
       {children}
@@ -73,13 +93,20 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  // If Clerk is configured, use the real auth
-  if (isClerkConfigured()) {
-    try {
-      const { isSignedIn } = useClerkAuth()
-      const { user: clerkUser } = useUser()
+  const isConfigured = isClerkConfigured()
+  const clerkAuth = isConfigured ? useClerkAuth() : { isSignedIn: false }
+  const clerkUserHook = isConfigured ? useUser() : { user: null }
+  const { isSignedIn } = clerkAuth
+  const { user: clerkUser } = clerkUserHook
 
-      return { isSignedIn, user: clerkUser }
+  // If Clerk is configured, use the real auth
+  if (isConfigured) {
+    try {
+      return {
+        isSignedIn,
+        user: clerkUser,
+        signInWithEmailPassword: async () => false, // Not implemented for real Clerk
+      }
     } catch (error) {
       // Fallback to mock auth if there's an error with Clerk
       console.error("Error using Clerk auth:", error)
