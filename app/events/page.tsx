@@ -12,7 +12,14 @@ import { getEvents } from "@/lib/supabase"
 export const revalidate = 86400 // Revalidate every 24 hours
 
 export default async function EventsPage() {
-  const events = await getEvents()
+  // Wrap in try/catch to handle any errors during data fetching
+  let events = []
+  try {
+    events = await getEvents()
+  } catch (error) {
+    console.error("Error fetching events:", error)
+    // Continue with empty events array
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -88,7 +95,7 @@ export default async function EventsPage() {
               <div className="md:w-3/4">
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   <Suspense fallback={<p>Loading events...</p>}>
-                    {events.length > 0 ? (
+                    {events && events.length > 0 ? (
                       events.map((event) => <EventCard key={event.id} event={event} />)
                     ) : (
                       <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">

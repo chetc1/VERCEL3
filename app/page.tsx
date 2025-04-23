@@ -11,8 +11,21 @@ import { getFeaturedEvent, getEvents } from "@/lib/supabase"
 export const revalidate = 86400 // Revalidate every 24 hours
 
 export default async function HomePage() {
-  const featuredEvent = await getFeaturedEvent()
-  const upcomingEvents = await getEvents(6)
+  // Wrap in try/catch to handle any errors during data fetching
+  let featuredEvent = null
+  let upcomingEvents = []
+
+  try {
+    featuredEvent = await getFeaturedEvent()
+  } catch (error) {
+    console.error("Error fetching featured event:", error)
+  }
+
+  try {
+    upcomingEvents = await getEvents(6)
+  } catch (error) {
+    console.error("Error fetching upcoming events:", error)
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -89,7 +102,7 @@ export default async function HomePage() {
             </div>
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 md:grid-cols-2 lg:grid-cols-3">
               <Suspense fallback={<p>Loading events...</p>}>
-                {upcomingEvents.length > 0 ? (
+                {upcomingEvents && upcomingEvents.length > 0 ? (
                   upcomingEvents.map((event) => <EventCard key={event.id} event={event} />)
                 ) : (
                   <div className="col-span-full flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
@@ -115,7 +128,7 @@ export default async function HomePage() {
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
               <div className="flex justify-center">
                 <img
-                  src="/virtual-event-host.png"
+                  src="/global-connections-event.png"
                   alt="Host a Virtual Event"
                   className="rounded-lg object-cover aspect-video"
                   width={600}

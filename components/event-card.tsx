@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Calendar, Clock, DollarSign, Users } from "lucide-react"
-import { formatDistanceToNow, format } from "date-fns"
+import { formatDistanceToNow, format, isValid } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,12 +14,46 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, featured = false }: EventCardProps) {
-  const startDate = new Date(event.startTime)
-  const endDate = new Date(event.endTime)
+  // Safely parse dates with error handling
+  const parseDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      if (!isValid(date)) {
+        console.error(`Invalid date: ${dateString}`)
+        return new Date() // Fallback to current date
+      }
+      return date
+    } catch (error) {
+      console.error(`Error parsing date: ${dateString}`, error)
+      return new Date() // Fallback to current date
+    }
+  }
 
-  const formattedDate = format(startDate, "MMMM d, yyyy")
-  const formattedTime = `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
-  const timeFromNow = formatDistanceToNow(startDate, { addSuffix: true })
+  const startDate = parseDate(event.startTime)
+  const endDate = parseDate(event.endTime)
+
+  // Safe formatting with fallbacks
+  const formatDateSafely = (date: Date, formatStr: string, fallback = "N/A") => {
+    try {
+      return isValid(date) ? format(date, formatStr) : fallback
+    } catch (error) {
+      console.error(`Error formatting date: ${date}`, error)
+      return fallback
+    }
+  }
+
+  const formatDistanceSafely = (date: Date, fallback = "upcoming") => {
+    try {
+      return isValid(date) ? formatDistanceToNow(date, { addSuffix: true }) : fallback
+    } catch (error) {
+      console.error(`Error calculating distance: ${date}`, error)
+      return fallback
+    }
+  }
+
+  const formattedDate = formatDateSafely(startDate, "MMMM d, yyyy")
+  const formattedTime = `${formatDateSafely(startDate, "h:mm a")} - ${formatDateSafely(endDate, "h:mm a")}`
+  const timeFromNow = formatDistanceSafely(startDate)
 
   return (
     <Card className={featured ? "border-primary" : ""}>

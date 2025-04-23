@@ -110,24 +110,28 @@ export const mockUsers: User[] = [
   },
 ]
 
-// Calculate dates relative to current date
-const now = new Date()
-const tomorrow = new Date(now)
-tomorrow.setDate(tomorrow.getDate() + 1)
-const nextWeek = new Date(now)
-nextWeek.setDate(nextWeek.getDate() + 7)
-const twoWeeksLater = new Date(now)
-twoWeeksLater.setDate(twoWeeksLater.getDate() + 14)
+// Generate valid dates for events
+function generateFutureDate(daysFromNow: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + daysFromNow)
+  return date.toISOString()
+}
 
-// Mock Events
+function generateEndTime(startTime: string, durationHours: number): string {
+  const startDate = new Date(startTime)
+  const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000)
+  return endDate.toISOString()
+}
+
+// Mock Events with valid dates
 export const mockEvents: Event[] = [
   {
     id: "event-1",
     title: "Startup Pitch Practice",
     description:
       "Practice your startup pitch and get feedback from experienced founders and investors. Perfect your elevator pitch in a supportive environment.",
-    startTime: tomorrow.toISOString(),
-    endTime: new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    startTime: generateFutureDate(1),
+    endTime: generateEndTime(generateFutureDate(1), 2),
     price: 25,
     hostId: "user-1",
     maxAttendees: 50,
@@ -143,8 +147,8 @@ export const mockEvents: Event[] = [
     title: "Digital Marketing Masterclass",
     description:
       "Learn the latest digital marketing strategies to grow your business. From SEO to social media, this masterclass covers it all.",
-    startTime: nextWeek.toISOString(),
-    endTime: new Date(nextWeek.getTime() + 3 * 60 * 60 * 1000).toISOString(),
+    startTime: generateFutureDate(7),
+    endTime: generateEndTime(generateFutureDate(7), 3),
     price: 50,
     hostId: "user-2",
     maxAttendees: 50,
@@ -159,8 +163,8 @@ export const mockEvents: Event[] = [
     title: "Fundraising Strategies for Startups",
     description:
       "Discover effective fundraising strategies for your startup. Learn how to approach investors and create compelling pitch decks.",
-    startTime: twoWeeksLater.toISOString(),
-    endTime: new Date(twoWeeksLater.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    startTime: generateFutureDate(14),
+    endTime: generateEndTime(generateFutureDate(14), 2),
     price: 35,
     hostId: "user-3",
     maxAttendees: 50,
@@ -175,8 +179,8 @@ export const mockEvents: Event[] = [
     title: "UX Design Workshop",
     description:
       "Hands-on workshop on user experience design principles. Create intuitive and engaging user interfaces for your products.",
-    startTime: new Date(twoWeeksLater.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    endTime: new Date(twoWeeksLater.getTime() + 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
+    startTime: generateFutureDate(17),
+    endTime: generateEndTime(generateFutureDate(17), 4),
     price: 40,
     hostId: "user-4",
     maxAttendees: 50,
@@ -191,8 +195,8 @@ export const mockEvents: Event[] = [
     title: "Business Model Innovation",
     description:
       "Explore innovative business models that can disrupt industries. Learn from case studies of successful business model transformations.",
-    startTime: new Date(twoWeeksLater.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    endTime: new Date(twoWeeksLater.getTime() + 7 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
+    startTime: generateFutureDate(21),
+    endTime: generateEndTime(generateFutureDate(21), 2),
     price: 30,
     hostId: "user-5",
     maxAttendees: 50,
