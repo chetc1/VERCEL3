@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Calendar, Clock, CreditCard, Info, Users } from "lucide-react"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +19,7 @@ import { Footer } from "@/components/footer"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/clerk"
 import { getEvent } from "@/lib/supabase"
-import { createCheckoutSession, redirectToCheckout } from "@/lib/stripe"
+import { createCheckoutSession } from "@/lib/stripe"
 
 export default function PurchasePage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -36,13 +36,21 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
 
   // Fetch event data
   useEffect(() => {
-    const fetchEvent = async () => {
+    async function fetchEvent() {
       try {
+        setLoading(true)
         const eventData = await getEvent(params.id)
+
         if (!eventData) {
+          toast({
+            title: "Event Not Found",
+            description: "The event you're looking for doesn't exist.",
+            variant: "destructive",
+          })
           router.push("/events")
           return
         }
+
         setEvent(eventData)
       } catch (error) {
         console.error("Error fetching event:", error)
@@ -71,9 +79,18 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isSignedIn && !formData.name && !formData.email) {
+    if (!event) {
       toast({
-        title: "Missing information",
+        title: "Error",
+        description: "Event details not available. Please try again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!isSignedIn && (!formData.name || !formData.email)) {
+      toast({
+        title: "Missing Information",
         description: "Please sign in or provide your name and email.",
         variant: "destructive",
       })
@@ -84,18 +101,31 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
       setPurchasing(true)
 
       // Create checkout session
-      const userId = isSignedIn ? user?.id : "guest"
-      const result = await createCheckoutSession(event.id, userId, event.price)
+      const userId = isSignedIn && user ? user.id : "guest"
+      const price = event.price || 0
+
+      console.log("Creating checkout session with:", {
+        eventId: event.id,
+        userId,
+        price,
+      })
+
+      const result = await createCheckoutSession(event.id, userId, price)
 
       if (!result.success) {
         throw new Error(result.error || "Failed to create checkout session")
       }
 
-      // Redirect to checkout
+      // Redirect to success page directly for mock mode
       if (result.url) {
+        console.log("Redirecting to:", result.url)
         window.location.href = result.url
+      } else if (result.sessionId) {
+        console.log("Session created:", result.sessionId)
+        // For real Stripe integration
+        window.location.href = `/events/${event.id}/purchase/success?session_id=${result.sessionId}`
       } else {
-        await redirectToCheckout(result.sessionId)
+        throw new Error("No redirect URL or session ID returned")
       }
     } catch (error) {
       console.error("Error during checkout:", error)
@@ -104,7 +134,29 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
         description: "There was a problem processing your payment. Please try again.",
         variant: "destructive",
       })
+    } finally {
       setPurchasing(false)
+    }
+  }
+
+  // Safe date parsing and formatting
+  const parseDate = (dateString?: string) => {
+    if (!dateString) return new Date()
+    try {
+      const date = new Date(dateString)
+      return isValid(date) ? date : new Date()
+    } catch (error) {
+      console.error(`Error parsing date: ${dateString}`, error)
+      return new Date()
+    }
+  }
+
+  const formatDateSafely = (date: Date, formatStr: string, fallback = "N/A") => {
+    try {
+      return isValid(date) ? format(date, formatStr) : fallback
+    } catch (error) {
+      console.error(`Error formatting date: ${date}`, error)
+      return fallback
     }
   }
 
@@ -125,18 +177,28 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p>Event not found.</p>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Event Not Found</h2>
+            <p className="mb-4">The event you're looking for doesn't exist or has been removed.</p>
+            <Button asChild>
+              <Link href="/events">Browse Events</Link>
+            </Button>
+          </div>
         </main>
         <Footer />
       </div>
     )
   }
 
-  const startDate = new Date(event.startTime)
-  const endDate = new Date(event.endTime)
+  const startDate = parseDate(event.startTime)
+  const endDate = parseDate(event.endTime)
 
-  const formattedDate = format(startDate, "MMMM d, yyyy")
-  const formattedTime = `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
+  const formattedDate = formatDateSafely(startDate, "MMMM d, yyyy")
+  const formattedTime = `${formatDateSafely(startDate, "h:mm a")} - ${formatDateSafely(endDate, "h:mm a")}`
+
+  // Ensure attendees is an array
+  const attendees = Array.isArray(event.attendees) ? event.attendees : []
+  const maxAttendees = event.maxAttendees || 50
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -159,16 +221,16 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isSignedIn ? (
+                  {isSignedIn && user ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label>Name</Label>
-                          <p className="text-sm mt-1">{user?.name}</p>
+                          <p className="text-sm mt-1">{user.name || "N/A"}</p>
                         </div>
                         <div>
                           <Label>Email</Label>
-                          <p className="text-sm mt-1">{user?.email}</p>
+                          <p className="text-sm mt-1">{user.email || "N/A"}</p>
                         </div>
                       </div>
                       <div>
@@ -258,7 +320,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                 </CardContent>
                 <CardFooter>
                   <Button className="w-full" onClick={handleSubmit} disabled={purchasing}>
-                    {purchasing ? "Processing..." : `Pay $${event.price.toFixed(2)}`}
+                    {purchasing ? "Processing..." : `Pay $${(event.price || 0).toFixed(2)}`}
                   </Button>
                 </CardFooter>
               </Card>
@@ -271,7 +333,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
                     <img
-                      src={`/abstract-geometric-shapes.png?key=8qr21&height=80&width=80&query=${encodeURIComponent(event.title)}`}
+                      src={`/abstract-geometric-shapes.png?height=80&width=80&query=${encodeURIComponent(event.title)}`}
                       alt={event.title}
                       className="rounded-lg object-cover"
                       width={80}
@@ -298,7 +360,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                       <div>
                         <p className="font-medium">Attendees</p>
                         <p className="text-sm text-muted-foreground">
-                          {event.attendees.length} registered, {event.maxAttendees - event.attendees.length} spots left
+                          {attendees.length} registered, {maxAttendees - attendees.length} spots left
                         </p>
                       </div>
                     </div>
@@ -307,7 +369,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                   <div className="space-y-1.5">
                     <div className="flex justify-between">
                       <span>Ticket Price</span>
-                      <span>${event.price.toFixed(2)}</span>
+                      <span>${(event.price || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Platform Fee</span>
@@ -316,7 +378,7 @@ export default function PurchasePage({ params }: { params: { id: string } }) {
                     <Separator className="my-2" />
                     <div className="flex justify-between font-medium">
                       <span>Total</span>
-                      <span>${event.price.toFixed(2)}</span>
+                      <span>${(event.price || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </CardContent>

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Calendar, Clock, DollarSign, MapPin, Share2, Users } from "lucide-react"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -19,18 +19,49 @@ interface EventPageProps {
 }
 
 export default async function EventPage({ params }: EventPageProps) {
-  const event = await getEvent(params.id)
+  let event = null
+
+  try {
+    event = await getEvent(params.id)
+  } catch (error) {
+    console.error("Error fetching event:", error)
+  }
 
   if (!event) {
     notFound()
   }
 
-  const startDate = new Date(event.startTime)
-  const endDate = new Date(event.endTime)
+  // Safely parse dates
+  const parseDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return isValid(date) ? date : new Date()
+    } catch (error) {
+      console.error(`Error parsing date: ${dateString}`, error)
+      return new Date()
+    }
+  }
 
-  const formattedDate = format(startDate, "MMMM d, yyyy")
-  const formattedTime = `${format(startDate, "h:mm a")} - ${format(endDate, "h:mm a")}`
-  const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60) // in minutes
+  const startDate = parseDate(event.startTime)
+  const endDate = parseDate(event.endTime)
+
+  // Safe formatting
+  const formatDateSafely = (date: Date, formatStr: string, fallback = "N/A") => {
+    try {
+      return isValid(date) ? format(date, formatStr) : fallback
+    } catch (error) {
+      console.error(`Error formatting date: ${date}`, error)
+      return fallback
+    }
+  }
+
+  const formattedDate = formatDateSafely(startDate, "MMMM d, yyyy")
+  const formattedTime = `${formatDateSafely(startDate, "h:mm a")} - ${formatDateSafely(endDate, "h:mm a")}`
+  const duration = Math.max(0, (endDate.getTime() - startDate.getTime()) / (1000 * 60)) // in minutes
+
+  // Ensure attendees is an array
+  const attendees = Array.isArray(event.attendees) ? event.attendees : []
+  const maxAttendees = event.maxAttendees || 50
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -49,10 +80,10 @@ export default async function EventPage({ params }: EventPageProps) {
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">{event.title}</h1>
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={event.host?.image || "/placeholder.svg"} alt={event.host?.name} />
-                    <AvatarFallback>{event.host?.name?.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={event.host?.image || "/placeholder.svg"} alt={event.host?.name || "Host"} />
+                    <AvatarFallback>{event.host?.name?.charAt(0) || "H"}</AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium">Hosted by {event.host?.name}</span>
+                  <span className="text-sm font-medium">Hosted by {event.host?.name || "Anonymous"}</span>
                 </div>
                 <div className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2">
@@ -65,12 +96,12 @@ export default async function EventPage({ params }: EventPageProps) {
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-muted-foreground" />
-                    <span>${event.price.toFixed(2)}</span>
+                    <span>${(event.price || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-muted-foreground" />
                     <span>
-                      {event.attendees.length}/{event.maxAttendees} attendees
+                      {attendees.length}/{maxAttendees} attendees
                     </span>
                   </div>
                 </div>
@@ -86,7 +117,7 @@ export default async function EventPage({ params }: EventPageProps) {
               </div>
               <div className="flex justify-center">
                 <img
-                  src={`/placeholder.svg?height=400&width=600&query=${encodeURIComponent(event.title)}`}
+                  src={`/abstract-geometric-shapes.png?height=400&width=600&query=${encodeURIComponent(event.title)}`}
                   alt={event.title}
                   className="rounded-lg object-cover aspect-video"
                   width={600}
@@ -148,14 +179,13 @@ export default async function EventPage({ params }: EventPageProps) {
                         <div>
                           <p className="font-medium">Attendees</p>
                           <p className="text-sm text-muted-foreground">
-                            {event.attendees.length} registered, {event.maxAttendees - event.attendees.length} spots
-                            left
+                            {attendees.length} registered, {maxAttendees - attendees.length} spots left
                           </p>
                         </div>
                       </div>
                     </div>
                     <Button asChild className="w-full">
-                      <Link href={`/events/${event.id}/purchase`}>Buy Ticket - ${event.price.toFixed(2)}</Link>
+                      <Link href={`/events/${event.id}/purchase`}>Buy Ticket - ${(event.price || 0).toFixed(2)}</Link>
                     </Button>
                   </div>
                 </div>
@@ -164,19 +194,19 @@ export default async function EventPage({ params }: EventPageProps) {
                     <h3 className="text-lg font-semibold">About the Host</h3>
                     <div className="flex items-center gap-4">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={event.host?.image || "/placeholder.svg"} alt={event.host?.name} />
-                        <AvatarFallback>{event.host?.name?.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={event.host?.image || "/placeholder.svg"} alt={event.host?.name || "Host"} />
+                        <AvatarFallback>{event.host?.name?.charAt(0) || "H"}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{event.host?.name}</p>
-                        <p className="text-sm text-muted-foreground">{event.host?.industry}</p>
+                        <p className="font-medium">{event.host?.name || "Anonymous"}</p>
+                        <p className="text-sm text-muted-foreground">{event.host?.industry || "Various Industries"}</p>
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {event.host?.bio || "Experienced entrepreneur sharing insights and knowledge."}
                     </p>
                     <Button asChild variant="outline" className="w-full">
-                      <Link href={`/hosts/${event.hostId}`}>View Profile</Link>
+                      <Link href={`/hosts/${event.hostId || "unknown"}`}>View Profile</Link>
                     </Button>
                   </div>
                 </div>

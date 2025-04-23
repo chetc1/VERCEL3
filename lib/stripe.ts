@@ -15,7 +15,34 @@ const isStripeConfigured = () => {
 
 // Create a checkout session for an event ticket
 export async function createCheckoutSession(eventId: string, userId: string, price: number) {
+  console.log("Creating checkout session:", { eventId, userId, price })
+
+  if (!eventId) {
+    console.error("Missing eventId")
+    return {
+      success: false,
+      error: "Missing event ID",
+    }
+  }
+
+  if (!userId) {
+    console.error("Missing userId")
+    return {
+      success: false,
+      error: "Missing user ID",
+    }
+  }
+
+  if (price === undefined || price === null) {
+    console.error("Missing price")
+    return {
+      success: false,
+      error: "Missing price",
+    }
+  }
+
   if (!isStripeConfigured()) {
+    console.log("Stripe not configured, using mock mode")
     // In mock mode, return a success response with a mock session ID
     return {
       success: true,
@@ -25,6 +52,7 @@ export async function createCheckoutSession(eventId: string, userId: string, pri
   }
 
   try {
+    console.log("Sending request to /api/checkout")
     const response = await fetch("/api/checkout", {
       method: "POST",
       headers: {
@@ -37,7 +65,9 @@ export async function createCheckoutSession(eventId: string, userId: string, pri
       }),
     })
 
+    console.log("Response status:", response.status)
     const data = await response.json()
+    console.log("Response data:", data)
 
     if (!response.ok) {
       throw new Error(data.error || "Failed to create checkout session")
@@ -52,14 +82,25 @@ export async function createCheckoutSession(eventId: string, userId: string, pri
     console.error("Error creating checkout session:", error)
     return {
       success: false,
-      error: "Failed to create checkout session",
+      error: error instanceof Error ? error.message : "Failed to create checkout session",
     }
   }
 }
 
 // Redirect to Stripe Checkout
 export async function redirectToCheckout(sessionId: string) {
+  console.log("Redirecting to checkout with session ID:", sessionId)
+
+  if (!sessionId) {
+    console.error("Missing sessionId")
+    return {
+      success: false,
+      error: "Missing session ID",
+    }
+  }
+
   if (!isStripeConfigured()) {
+    console.log("Stripe not configured, using mock mode")
     // In mock mode, redirect to success page
     window.location.href = `/events/${sessionId.split("_")[2]}/purchase/success?session_id=${sessionId}`
     return { success: true }
@@ -83,14 +124,25 @@ export async function redirectToCheckout(sessionId: string) {
     console.error("Error redirecting to checkout:", error)
     return {
       success: false,
-      error: "Failed to redirect to checkout",
+      error: error instanceof Error ? error.message : "Failed to redirect to checkout",
     }
   }
 }
 
 // Verify a checkout session
 export async function verifyCheckoutSession(sessionId: string) {
+  console.log("Verifying checkout session:", sessionId)
+
+  if (!sessionId) {
+    console.error("Missing sessionId")
+    return {
+      success: false,
+      error: "Missing session ID",
+    }
+  }
+
   if (!isStripeConfigured()) {
+    console.log("Stripe not configured, using mock mode")
     // In mock mode, return a success response
     return {
       success: true,
@@ -120,7 +172,7 @@ export async function verifyCheckoutSession(sessionId: string) {
     console.error("Error verifying checkout session:", error)
     return {
       success: false,
-      error: "Failed to verify checkout session",
+      error: error instanceof Error ? error.message : "Failed to verify checkout session",
     }
   }
 }

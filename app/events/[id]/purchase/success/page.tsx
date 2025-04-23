@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Calendar, Check, ChevronRight, Clock } from "lucide-react"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,33 +24,52 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id")
+    console.log("Success page: Session ID from URL:", sessionId)
 
     if (!sessionId) {
+      console.log("Success page: No session ID found, redirecting to event page")
+      toast({
+        title: "Missing Information",
+        description: "No purchase information found. Redirecting to event page.",
+        variant: "destructive",
+      })
       router.push(`/events/${params.id}`)
       return
     }
 
     const verifyPurchase = async () => {
       try {
+        console.log("Success page: Verifying purchase")
         // Verify the checkout session
         const result = await verifyCheckoutSession(sessionId)
+        console.log("Success page: Verification result:", result)
 
         if (!result.success) {
           throw new Error(result.error || "Failed to verify purchase")
         }
 
         setVerified(true)
+        console.log("Success page: Purchase verified")
 
         // Fetch event details
+        console.log("Success page: Fetching event details")
         const eventData = await getEvent(params.id)
+
         if (!eventData) {
+          console.log("Success page: Event not found")
+          toast({
+            title: "Event Not Found",
+            description: "The event you purchased a ticket for could not be found.",
+            variant: "destructive",
+          })
           router.push("/events")
           return
         }
 
+        console.log("Success page: Event data loaded")
         setEvent(eventData)
       } catch (error) {
-        console.error("Error verifying purchase:", error)
+        console.error("Success page: Error verifying purchase:", error)
         toast({
           title: "Verification Error",
           description: "There was a problem verifying your purchase. Please contact support.",
@@ -64,6 +83,27 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
 
     verifyPurchase()
   }, [params.id, router, searchParams, toast])
+
+  // Safe date parsing and formatting
+  const parseDate = (dateString?: string) => {
+    if (!dateString) return new Date()
+    try {
+      const date = new Date(dateString)
+      return isValid(date) ? date : new Date()
+    } catch (error) {
+      console.error(`Error parsing date: ${dateString}`, error)
+      return new Date()
+    }
+  }
+
+  const formatDateSafely = (date: Date, formatStr: string, fallback = "N/A") => {
+    try {
+      return isValid(date) ? format(date, formatStr) : fallback
+    } catch (error) {
+      console.error(`Error formatting date: ${date}`, error)
+      return fallback
+    }
+  }
 
   if (loading) {
     return (
@@ -82,16 +122,22 @@ export default function SuccessPage({ params }: { params: { id: string } }) {
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <p>Purchase verification failed. Please try again.</p>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Purchase Verification Failed</h2>
+            <p className="mb-4">We couldn't verify your purchase. Please try again or contact support.</p>
+            <Button asChild>
+              <Link href={`/events/${params.id}`}>Back to Event</Link>
+            </Button>
+          </div>
         </main>
         <Footer />
       </div>
     )
   }
 
-  const startDate = new Date(event.startTime)
-  const formattedDate = format(startDate, "MMMM d, yyyy")
-  const formattedTime = format(startDate, "h:mm a")
+  const startDate = parseDate(event.startTime)
+  const formattedDate = formatDateSafely(startDate, "MMMM d, yyyy")
+  const formattedTime = formatDateSafely(startDate, "h:mm a")
 
   return (
     <div className="flex min-h-screen flex-col">
