@@ -25,6 +25,8 @@ export function EventCard({ event, featured = false }: EventCardProps) {
       return date
     } catch (error) {
       console.error(`Error parsing date: ${dateString}`, error)
+      return new Date() // Fallback  {
+      console.error(`Error parsing date: ${dateString}`, error)
       return new Date() // Fallback to current date
     }
   }
@@ -89,7 +91,7 @@ export function EventCard({ event, featured = false }: EventCardProps) {
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              {event.attendees.length}/{event.maxAttendees} attendees
+              {Array.isArray(event.attendees) ? event.attendees.length : 0}/{event.maxAttendees} attendees
             </span>
           </div>
         </div>

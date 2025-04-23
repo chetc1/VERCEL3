@@ -11,7 +11,7 @@ import { getFeaturedEvent, getEvents } from "@/lib/supabase"
 export const revalidate = 86400 // Revalidate every 24 hours
 
 export default async function HomePage() {
-  // Wrap in try/catch to handle any errors during data fetching
+  // Initialize with safe defaults
   let featuredEvent = null
   let upcomingEvents = []
 
@@ -22,7 +22,9 @@ export default async function HomePage() {
   }
 
   try {
-    upcomingEvents = await getEvents(6)
+    const fetchedEvents = await getEvents(6)
+    // Ensure upcomingEvents is always an array
+    upcomingEvents = Array.isArray(fetchedEvents) ? fetchedEvents : []
   } catch (error) {
     console.error("Error fetching upcoming events:", error)
   }

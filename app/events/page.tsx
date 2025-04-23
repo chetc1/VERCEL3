@@ -12,10 +12,13 @@ import { getEvents } from "@/lib/supabase"
 export const revalidate = 86400 // Revalidate every 24 hours
 
 export default async function EventsPage() {
-  // Wrap in try/catch to handle any errors during data fetching
+  // Initialize events as an empty array to prevent undefined
   let events = []
+
   try {
-    events = await getEvents()
+    const fetchedEvents = await getEvents()
+    // Ensure events is always an array
+    events = Array.isArray(fetchedEvents) ? fetchedEvents : []
   } catch (error) {
     console.error("Error fetching events:", error)
     // Continue with empty events array
